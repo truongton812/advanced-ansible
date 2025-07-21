@@ -1,0 +1,53 @@
+---
+- hosts: localhost
+  tasks:
+  - name: install python and its dependencies
+    apt:
+      pkg:
+      - python3
+      - python3-setuptools
+      - python3-dev
+      - build-essential
+      - python3-pip
+      - python3-mysqldb
+  - name: install MySQL database
+    apt:
+      pkg:
+      - mysql-server
+      - mysql-client
+  - name: start database service
+    service:
+      name: mysql
+      state: started
+      enabled: yes
+- name: Create database
+  community.mysql.mysql_db:
+    name: employee_db
+    state: present
+- name: create mysql user
+  community.mysql.mysql_user:
+    name: db_user
+    password: 'Passw0rd'
+    priv: '*.*:ALL'
+    state: present
+    host: '%'
+- name: create mysql table
+  community.mysql.mysql_query:
+    login_user: db_user
+    login_password: Passw0rd
+    login_host: 127.0.0.1
+    login_db: employee_db
+    query:
+    - CREATE TABLE employees (name VARCHAR(20));
+    - INSERT INTO employees VALUES ('JOHN');
+  - name: install Python Flask
+    pip:
+      name:
+      - flask
+      - flask-mysql
+  - name: copy app.py
+    copy:
+      src: files/app.py
+      dest: .
+  - name: start web server
+    shell: nohup flask --app app.py run --host=0.0.0.0 &
