@@ -1,13 +1,70 @@
-#### Asynchronous Action:
+<img width="1110" height="233" alt="image" src="https://github.com/user-attachments/assets/fb04904f-8dce-4f93-9201-f66318a18595" />#### Asynchronous Action:
 
 By default, để run task trên target server, ansible server cần mở một SSH connection đến target server và duy trì nó trong suốt thời gian chạy task (gọi là synchronous action)
 Ta có thể thay đổi thành asynchronous action, tức server chỉ gửi lệnh đến target và đóng luôn SSH connection
 
 VD: chạy 1 script health check, gather metric cần thời gian 5 phút để xong, ta nên dùng asynchronous để không phải quan tâm đến script đấy, chỉ quay lại check sau 5'
-Các option của asynchronos: async - là khoảng thời gian mà task cần để chạy và poll - là khoảng thời gian ansible sẽ quay lại để check kết quả (default là 10s)
+Các option của asynchronos: async - là khoảng thời gian tối đa mà 1 task có thể chạy, nếu quá thời gian ansible sẽ chuyển qua task tiếp theo và poll - là khoảng thời gian ansible sẽ quay lại để check kết quả (default là 10s)
 
-Bổ sung nội dung từ ảnh chụp màn hình
+Example 1
+```
+# Ansible Playbook
+- name: Deploy Web Application
+  hosts: db_and_web_server
+  tasks:
+    - command: /opt/monitor_webapp.py
+      async: 360
+      poll: 60
 
+    - command: /opt/monitor_database.py
+      async: 360
+      poll: 60
+```
+-> Behavior của ansible: chạy 1st task, 60s quay lại check 1 lần, chờ cho hết 6 phút sau đó chuyển qua 2nd task
+ Ansible sẽ kiểm tra trạng thái tác vụ không đồng bộ này mỗi 60 giây. Nếu sau 360 giây mà tác vụ vẫn chưa kết thúc, Ansible sẽ kết thúc việc theo dõi.
+ Như vậy, mỗi lệnh sẽ được kích hoạt trên remote host rồi chạy ở chế độ nền (background) trong tối đa 6 phút, và Ansible theo dõi bằng cách hỏi kết quả mỗi phút một lần nhưng không chặn hoặc đợi lệnh hoàn tất ngay lập tức
+
+Example 2
+```
+# Ansible Playbook
+- name: Deploy Web Application
+  hosts: db_and_web_server
+  tasks:
+    - command: /opt/monitor_webapp.py
+      async: 360
+      poll: 0
+
+    - command: /opt/monitor_database.py
+      async: 360
+      poll: 0
+```
+-> Behavior của ansible: sau khi gửi lệnh chạy task 1 sẽ kick off luôn task 2, ansible cũng không quay lại để check result task 1 nữa. Để muốn chạy song song 2 task mà vẫn handle việc quay lại check thì ta cần register result của task 1 thành variable
+
+Example 3
+```
+# Ansible Playbook
+-
+  name: Deploy Web Application
+  hosts: db_and_web_server
+  tasks:
+    - command: /opt/monitor_webapp.py
+      async: 360
+      poll: 0
+      register: webapp_result
+
+    - command: /opt/monitor_database.py
+      async: 360
+      poll: 0
+      register: database_result
+
+    - name: Check status of tasks
+      async_status: jid={{ webapp_result.ansible_job_id }}
+      register: job_result
+      until: job_result.finished
+      retries: 30
+```
+async_status module dùng để check status của 1 async task, và module này cần đầu vào là job id. Lấy job id bằng cách register result của task thành variable và lấy ra job id từ đấy
+     
 
 #### strategy: định nghĩa cách playbook được thực thi
 khi ansible chạy trên nhiều servers thì default strategy là linear : chạy task 1 trên tất cả các servers, nếu tất cả sv xong task 1 thì mới chuyển sang task 2
@@ -23,10 +80,59 @@ Ta có thể thay đổi thành any_error_fatal: true -> nếu có 1 server fail
 
 ignore_errors: yes -> dùng để tiếp tục chạy playbook kể cả khi task fail
 
+failed_when: dùng để đánh fail dựa vào condition
+VD
+```
+- command: cat /var/log/server.log
+  register: command_output
+  failed_when: "'ERROR' in command_output.stdout"
+```
+-> fail nếu trong file log có chữ ERROR. Nếu không có failed_when thì task sẽ thành công nếu file server.log tồn tại. Note là failed_when sẽ fail condition = true
 
-lookups plugin
+#### String manipulation - filter
+The name is {{ my_name }} => The name is Bond
+
+The name is {{ my_name | upper }} => The name is BOND
+
+The name is {{ my_name | lower }} => The name is bond
+
+The name is {{ my_name | title }} => The name is Bond
+
+The name is {{ my_name | replace("Bond", "Bourne") }} => The name is Bourne
+
+The name is {{ first_name | default("James") }} {{ my_name }} => The name is James Bond
+
+#### filter - list and set 
+{{ [1, 2, 3] | min }}                 => 1
+
+{{ [1, 2, 3] | max }}                 => 3
+
+{{ [1, 2, 3, 2] | unique }}           => 1, 2, 3
+
+{{ [1, 2, 3, 4] | union([4, 5]) }}    => 1, 2, 3, 4, 5
+
+{{ [1, 2, 3, 4] | intersect([4, 5])}} => 4
+
+{{ 100 | random }}                    => Random number
+
+{{ ["The", "name", "is", "Bond"] | join(" ") }} => The name is Bond
+
+#### filter - file
+
+{{ "/etc/hosts" | basename }}                           => hosts
+
+{{ "c:\windows\hosts" | win_basename }}                 => hosts
+
+{{ "c:\windows\hosts" | win_splitdrive }}               => ["c:", "\windows\hosts"]
+
+{{ "c:\windows\hosts" | win_splitdrive | first }}       => "c:"
+
+{{ "c:\windows\hosts" | win_splitdrive | last }}        => "\windows\hosts"
+
+#### lookups plugin
 Use case: đọc nội dung file, VD file csv có format là Hostname,Password thì ta có thể lấy ra Password
 Ngoài csv còn có thể đọc ini, dns, mongodb
+
 
 
 #### Vault
