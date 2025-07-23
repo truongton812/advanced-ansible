@@ -226,9 +226,10 @@ if __name__ == "__main__":
 ./inventory.py --host web -> để lấy thông tin của target tên web
 
 #### Custom module
-là các python script, đặt vào trong thư mục module của ansible cùng với các builtin module có sẵn hoặc đặt vào trong thư mục library của project
+là các python script, đặt vào trong thư mục module của ansible cùng với các builtin module (usr/lib/python2.7/dist-packages/ansible/modules) có sẵn hoặc đặt vào trong thư mục library của project
 
 VD custom module để tự động thêm thời gian vào trong msg khi (giống debug nhưng có thêm thời gian)
+Có thể tham khảo thêm các builtin module của ansible
 
 ```python
 #!/usr/bin/python
@@ -339,3 +340,25 @@ Nếu bạn tạo file khác:
 import tenfile
 ```
 và chạy python main.py, sẽ chỉ in ra gì? Không có gì, vì đoạn code trong if __name__ == "__main__": trong tenfile.py không được chạy khi import
+
+#### custom plugin
+Ansible sử dụng nhiều plugin để perform các actions. VD Action plugin để invoke module, Connection plugin để thiết lập connection với hosts, Filter plugin để manuipulate data, Loookup plugin để làm việc với data từ external sourrce, Strategy plugin để control flow và execution của play, Callback plugin để handle events hoặc result của execution,...
+Ta có thể tạo các custom plugin cho phù hợp với nhu cầu
+VD tạo custom filter "average" dùng để tính trung bình (Tương tự như các filter max, min,  unique, union,..)
+
+Cách làm: tạo /filter_plugins/average.py (lưu ý tên phải trùng với tên filter). Và export ANSIBLE_FILTER_PLUGINS=/filter_plugins;
+```
+def average(list): #nhận đầu vào là list
+    '''
+    Find average of a list of numbers
+    '''
+    return sum(list) / float(len(list))
+
+class FilterModule(object):
+    ''' Query filter '''
+
+    def filters(self):
+        return {
+            'average': average
+        }
+```
