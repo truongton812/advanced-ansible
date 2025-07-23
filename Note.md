@@ -222,4 +222,5 @@ if __name__ == "__main__":
 
 Đây là script có truyền vào argumement, chạy lệnh 
 ./inventory.py --list -> để lấy ra list các target
+
 ./inventory.py --host web -> để lấy thông tin của target tên web
