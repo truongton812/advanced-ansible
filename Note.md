@@ -342,7 +342,7 @@ import tenfile
 và chạy python main.py, sẽ chỉ in ra gì? Không có gì, vì đoạn code trong if __name__ == "__main__": trong tenfile.py không được chạy khi import
 
 #### custom plugin
-Ansible sử dụng nhiều plugin để perform các actions. VD Action plugin để invoke module, Connection plugin để thiết lập connection với hosts, Filter plugin để manuipulate data, Loookup plugin để làm việc với data từ external sourrce, Strategy plugin để control flow và execution của play, Callback plugin để handle events hoặc result của execution,...
+Ansible sử dụng nhiều plugin để perform các actions. VD Action plugin để invoke module, Connection plugin để thiết lập connection với hosts, Filter plugin để manuipulate data, Loookup plugin để làm việc với data từ external sourrce, Strategy plugin để control flow và execution của play, Callback plugin để handle events hoặc result của execution (là output hiển thị lúc chạy xong mỗi task/playbook),...
 Ta có thể tạo các custom plugin cho phù hợp với nhu cầu
 VD tạo custom filter "average" dùng để tính trung bình (Tương tự như các filter max, min,  unique, union,..)
 
@@ -362,3 +362,7 @@ class FilterModule(object):
             'average': average
         }
 ```
+---
+Callback plugin
+Mặc định output của mỗi lần chạy task là ở dạng Skippy
+Ta có thể chuyển thành dạng json bằng cách: export ANS
