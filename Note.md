@@ -1,4 +1,4 @@
-<img width="1110" height="233" alt="image" src="https://github.com/user-attachments/assets/fb04904f-8dce-4f93-9201-f66318a18595" />#### Asynchronous Action:
+#### Asynchronous Action:
 
 By default, để run task trên target server, ansible server cần mở một SSH connection đến target server và duy trì nó trong suốt thời gian chạy task (gọi là synchronous action)
 Ta có thể thay đổi thành asynchronous action, tức server chỉ gửi lệnh đến target và đóng luôn SSH connection
@@ -131,9 +131,10 @@ The name is {{ first_name | default("James") }} {{ my_name }} => The name is Jam
 
 #### lookups plugin
 Use case: đọc nội dung file, VD file csv có format là Hostname,Password thì ta có thể lấy ra Password
+
+{{ lookup('csvfile', 'target1 file=/tmp/credentials.csv delimiter=,') }}
+
 Ngoài csv còn có thể đọc ini, dns, mongodb
-
-
 
 #### Vault
 Dùng để lưu các sensitive data dưới dạng encrypted . VD mã hóa file inventory : #ansible-vault encrypt inventory.txt (sau đó nhập password để tạo vault)
@@ -148,3 +149,77 @@ ansible-vault create inventory.txt -> tạo file mã hóa
 
 #### dynamic inventory
 dùng để lấy thông tin target từ external source như CMDB database, cloud platform API
+Example inventory.py
+```
+#!/usr/bin/env python
+
+import json
+
+# Get inventory data from source - CMDB or any other API
+def get_inventory_data():
+    return {
+        "databases": {
+            "hosts": ["db_server"],
+            "vars": {
+                "ansible_ssh_pass": "Passw0rd",
+                "ansible_ssh_host": "192.168.1.1"
+            }
+        },
+        "web": {
+            "hosts": ["web_server"],
+            "vars": {
+                "ansible_ssh_pass": "Passw0rd",
+                "ansible_ssh_host": "192.168.1.2"
+            }
+        }
+    }
+
+# Default main function
+if __name__ == "__main__":
+    inventory_data = get_inventory_data()
+    print(json.dumps(inventory_data))
+```
+ansible-playbook main.yaml -i inventory.py
+Mục đích của script inventory.py này là in ra thông tin inventory, sẽ là thông tin đầu vào cho ansible thực thi (lưu ý đây là khai báo static, còn trong thực tế thì inventory.py sẽ là script lấy thông tin từ external source và in ra)
+Format của output phải là json và là dạng dictionary of group
+
+Example 2
+```
+#!/usr/bin/env python
+
+import json
+
+# Get inventory data from source - CMDB or any other API
+def get_inventory_data():
+    return {
+        "databases": {
+            "hosts": ["db_server"],
+            "vars": {
+                "ansible_ssh_pass": "Passw0rd",
+                "ansible_ssh_host": "192.168.1.1"
+            }
+        },
+        # . . . . . . // Truncated
+    }
+
+def read_cli_args():
+    global args
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--list', action='store_true')
+    parser.add_argument('--host', action='store')
+    args = parser.parse_args()
+
+# Default main function
+if __name__ == "__main__":
+    global args
+    read_cli_args()
+    inventory_data = get_inventory_data()
+    if args.list:
+        print(json.dumps(inventory_data))
+    elif args.host:
+        print(json.dumps({'_meta': {'hostvars': {}}}))
+```
+
+Đây là script có truyền vào argumement, chạy lệnh 
+./inventory.py --list -> để lấy ra list các target
+./inventory.py --host web -> để lấy thông tin của target tên web
